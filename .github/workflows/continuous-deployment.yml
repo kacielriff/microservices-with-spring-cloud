@@ -23,3 +23,7 @@ jobs:
       with:
         distribution: temurin
         java-version: '25'
+
+    - name: Build Eureka Naming Server Docker Image
+      working-directory: ./microservices/naming-server
+      run: mvn spring-boot:build-image -DskipTests
