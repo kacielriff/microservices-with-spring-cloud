@@ -1,0 +1,145 @@
+name: microservices-udemy
+
+services:
+
+    zipkin-server:
+        image: openzipkin/zipkin:3.5.1
+        restart: always
+        ports:
+            - 9411:9411
+        networks:
+            - internal-network
+
+
+    naming-server:
+        image: kacielriff/naming-server
+        restart: always
+        build: 
+            context: ./naming-server
+            dockerfile: Dockerfile
+
+        ports:
+            - 8761:8761
+            
+        depends_on:
+            - zipkin-server
+
+        environment:
+            MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT: http://zipkin-server:9411/api/v2/spans
+
+        networks:
+            - internal-network
+
+
+    api-gateway:
+        image: kacielriff/api-gateway
+        restart: always
+        build: 
+            context: ./api-gateway
+            dockerfile: Dockerfile
+
+        ports:
+            - 8765:8765
+
+        depends_on:
+            - zipkin-server
+            - naming-server
+
+        environment:
+            MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT: http://zipkin-server:9411/api/v2/spans
+            EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://naming-server:8761/eureka
+
+        networks:
+            - internal-network
+
+
+    exchange-db:
+        image: postgres:17
+        restart: always
+        ports:
+            - 5432:5432
+
+        environment:
+            POSTGRES_DB: exchange_db
+            POSTGRES_USER: admin
+            POSTGRES_PASSWORD: admin
+
+        networks:
+            - internal-network
+        volumes:
+            - ./data/exchange_data:/var/lib/postgresql/data
+
+
+    book-db:
+        image: postgres:17
+        restart: always
+        ports:
+            - 5433:5432
+
+        environment:
+            POSTGRES_DB: book_db
+            POSTGRES_USER: admin
+            POSTGRES_PASSWORD: admin
+
+        networks:
+            - internal-network
+        volumes:
+            - ./data/book_data:/var/lib/postgresql/data
+
+    
+    exchange-service:
+        image: kacielriff/exchange-service
+        restart: always
+        build: 
+            context: ./exchange-service
+            dockerfile: Dockerfile
+
+        ports:
+            - 8000:8000
+
+        depends_on:
+            - zipkin-server
+            - naming-server
+            - exchange-db
+
+        environment:
+            MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT: http://zipkin-server:9411/api/v2/spans
+            EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://naming-server:8761/eureka
+            SPRING_DATASOURCE_URL: jdbc:postgresql://exchange-db:5432/exchange_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&enabledTLSProtocols=TLSv1.2
+            SPRING_DATASOURCE_USERNAME: admin
+            SPRING_DATASOURCE_PASSWORD: admin
+
+        networks:
+            - internal-network
+
+    
+    book-service:
+        image: kacielriff/book-service
+        restart: always
+        build: 
+            context: ./book-service
+            dockerfile: Dockerfile
+
+        ports:
+            - 8100:8100
+
+        depends_on:
+            - zipkin-server
+            - naming-server
+            - book-db
+
+        environment:
+            MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT: http://zipkin-server:9411/api/v2/spans
+            EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://naming-server:8761/eureka
+            SPRING_DATASOURCE_URL: jdbc:postgresql://book-db:5432/book_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&enabledTLSProtocols=TLSv1.2
+            SPRING_DATASOURCE_USERNAME: admin
+            SPRING_DATASOURCE_PASSWORD: admin
+
+        networks:
+            - internal-network
+
+
+networks:
+    internal-network:
+        name: internal-network
+        driver: bridge

@@ -1,0 +1,9 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE TABLE books (
+    book_id UUID PRIMARY KEY,
+    author VARCHAR(255) NOT NULL,
+    launch_date TIMESTAMP NOT NULL,
+    price NUMERIC(19, 6) NOT NULL,
+    title VARCHAR(255) NOT NULL
+);
